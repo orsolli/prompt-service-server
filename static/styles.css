@@ -1,0 +1,56 @@
+body {
+    background-color: unset;
+}
+.import-form {
+    margin: 1rem 0;
+    padding: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+.import-form textarea {
+    width: 100%;
+    height: 15rem;
+    font-family: monospace;
+}
+.key-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    border: 1px solid #eee;
+    border-radius: 4px;
+}
+.key-item .key-button {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin-right: 0.5rem;
+    text-align: left;
+}
+.key-item button {
+    margin-left: 0.5rem;
+}
+.import-instructions {
+    margin: 0.5rem 0;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-size: 0.9rem;
+}
+.import-instructions h4 {
+    margin-top: 0;
+}
+.import-instructions ul {
+    margin: 0.5rem 0;
+    padding-left: 1.5rem;
+}
+.import-instructions li {
+    margin: 0.2rem 0;
+}
+.public-key-input {
+    margin-top: 1rem;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
