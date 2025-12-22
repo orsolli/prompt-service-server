@@ -61,8 +61,14 @@ export function PromptList() {
             } else if (data.type === 'challenge_updated') {
                 console.log('Challenge updated, TODO: handle re-authentication');
             } else if (data.type === 'new_prompt') {
-                // Add new prompt to the list
                 fetchPrompts(publicKeyHash);
+            } else if (data.type === 'prompt_responded') {
+                const [ promptId, ...response ] = data.content.split(':');
+                setPrompts(prev => 
+                    prev.map(prompt => 
+                        prompt.id === promptId ? {...prompt, response: response.join(':') || ' '} : prompt
+                    )
+                );
             }
         };
         

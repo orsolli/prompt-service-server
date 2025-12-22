@@ -92,7 +92,10 @@ func (h *PromptHandler) Respond(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	prompt.Callback(r.FormValue("response"))
+	response := make([]byte, r.ContentLength)
+	r.Body.Read(response)
+	prompt.Callback(string(response))
+	h.store.SendEventToConnections(prompt.Key, "prompt_responded", prompt.Id+":"+string(response))
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(prompt.Id))
 }

@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"sync"
@@ -116,7 +117,8 @@ func (s *PromptStore) SendEventToConnections(key string, eventType string, data 
 }
 
 func (s *PromptStore) SendEvent(w http.ResponseWriter, flusher http.Flusher, eventType string, data string) {
-	event := fmt.Sprintf("data: {\"type\": \"%s\", \"content\": \"%s\"}\n\n", eventType, data)
+	escapedData, _ := json.Marshal(data)
+	event := fmt.Sprintf("data: {\"type\": \"%s\", \"content\": %s}\n\n", eventType, escapedData)
 	w.Write([]byte(event))
 	flusher.Flush()
 }
