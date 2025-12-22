@@ -1,11 +1,6 @@
 package handlers
 
 import (
-	"crypto/ed25519"
-	"crypto/sha256"
-	"encoding/base64"
-	"encoding/hex"
-	"fmt"
 	"net/http"
 	"prompt-service-server/core"
 	"time"
@@ -25,53 +20,16 @@ func (h *SSEHandler) Get(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	keyHash := vars["id"]
 
-	// Check if cookie contains matching public key
-	cookie, err := r.Cookie("publicKey")
-	if err != nil {
-		// Redirect to root
-		http.Redirect(w, r, "/", http.StatusFound)
+	// Authenticate and verify CSRF for this request
+	if _, err := AuthenticateAndVerifyCSRF(w, r, keyHash); err != nil {
+		// Error response already written by helper
 		return
 	}
-
-	// Verify the cookie's public key matches the hash
-	cookieKey := cookie.Value
-	hashedKey := sha256.Sum256([]byte(cookieKey))
-	if hex.EncodeToString(hashedKey[:]) != keyHash {
-		// Redirect to root
-		http.Redirect(w, r, "/", http.StatusFound)
-		return
-	}
-
-	// Verify signature (similar to prompt handlers)
-	signature, err := r.Cookie("CSRFChallenge")
-	if err != nil {
-		http.Error(w, "Missing signature", http.StatusUnauthorized)
-		return
-	}
-
-	// Verify token (similar to prompt handlers)
-	token, err := r.Cookie("CSRFToken")
-	if err != nil {
-		http.Error(w, "Missing token", http.StatusUnauthorized)
-		return
-	}
-
-	publicKey, err := base64.StdEncoding.DecodeString(cookieKey)
-	if err != nil {
-		http.Error(w, "Failed to decode", http.StatusUnauthorized)
-		return
-	}
-
-	signatureBytes, err := base64.StdEncoding.DecodeString(signature.Value)
-	if err != nil {
-		http.Error(w, "Failed to decode", http.StatusUnauthorized)
-		return
-	}
-
-	valid := ed25519.Verify(publicKey, []byte(token.Value), signatureBytes)
-	if valid == false {
-		http.Error(w, "Invalid signature", http.StatusUnauthorized)
-		return
+	// cookieKey is the base64-encoded public key string (as in the cookie)
+	cookie, _ := r.Cookie("publicKey")
+	cookieKey := ""
+	if cookie != nil {
+		cookieKey = cookie.Value
 	}
 
 	// Validate signature against public key
@@ -89,7 +47,7 @@ func (h *SSEHandler) Get(w http.ResponseWriter, r *http.Request) {
 	connection := h.store.AddSSEConnection(cookieKey, w, flusher)
 
 	// Send initial connection confirmation
-	h.sendEvent(w, flusher, "connected", "Connection established")
+	h.store.SendEvent(w, flusher, "connected", "Connection established")
 
 	// Keep connection alive
 	ticker := time.NewTicker(5 * time.Second)
@@ -99,17 +57,11 @@ func (h *SSEHandler) Get(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-ticker.C:
 			// Send heartbeat
-			h.sendEvent(w, flusher, "heartbeat", "alive")
+			h.store.SendEvent(w, flusher, "heartbeat", "alive")
 		case <-r.Context().Done():
 			// Remove connection
 			h.store.RemoveSSEConnection(cookieKey, connection)
 			return
 		}
 	}
-}
-
-func (h *SSEHandler) sendEvent(w http.ResponseWriter, flusher http.Flusher, eventType, data string) {
-	event := fmt.Sprintf("event: %s\ndata: %s\n\n", eventType, data)
-	w.Write([]byte(event))
-	flusher.Flush()
 }

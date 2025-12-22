@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"prompt-service-server/core"
 	"prompt-service-server/utils"
+
+	"github.com/gorilla/mux"
 )
 
 type PromptHandler struct {
@@ -49,10 +51,11 @@ func (h *PromptHandler) Post(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PromptHandler) Get(w http.ResponseWriter, r *http.Request) {
-	// Verify signature
-	signature := r.Header.Get("Authorization")
-	if signature == "" {
-		http.Error(w, "Missing signature", http.StatusUnauthorized)
+	vars := mux.Vars(r)
+	keyHash := vars["id"]
+	// Authenticate and verify CSRF for this request
+	if _, err := AuthenticateAndVerifyCSRF(w, r, keyHash); err != nil {
+		// Error response already written by helper
 		return
 	}
 

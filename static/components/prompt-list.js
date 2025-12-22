@@ -53,18 +53,16 @@ export function PromptList() {
             withCredentials: true
         });
         
-        eventSource.onmessage = (event) => {
+        eventSource.onmessage = function(event) {
+            console.log('SSE Message:', event.data);
             const data = JSON.parse(event.data);
-            if (data.type === 'new_prompt') {
+            if (data.type === 'connected') {
+                fetchPrompts(publicKeyHash);
+            } else if (data.type === 'challenge_updated') {
+                console.log('Challenge updated, TODO: handle re-authentication');
+            } else if (data.type === 'new_prompt') {
                 // Add new prompt to the list
-                setPrompts(prev => [data, ...prev]);
-            } else if (data.type === 'response_received') {
-                // Update prompt with response
-                setPrompts(prev => 
-                    prev.map(prompt => 
-                        prompt.id === data.promptId ? {...prompt, response: data.response} : prompt
-                    )
-                );
+                fetchPrompts(publicKeyHash);
             }
         };
         
@@ -101,18 +99,17 @@ export function PromptList() {
     };
 
     // Fetch prompts from API
-    const fetchPrompts = async () => {
-        if (!activeKey) return;
-        
+    const fetchPrompts = async (publicKeyHash) => {
         setLoadingPrompts(true);
         try {
-            const response = await fetch('/api/prompts', {
+            const response = await fetch(`/api/prompts/${publicKeyHash}`, {
                 method: 'GET',
                 credentials: 'same-origin'
             });
             
             if (response.ok) {
                 const data = await response.json();
+                if (!Array.isArray(data)) throw new Error('Invalid prompts data');
                 setPrompts(data);
             } else {
                 setError('Failed to fetch prompts');
@@ -217,9 +214,6 @@ export function PromptList() {
                     h('div', { className: 'prompt-item' },
                         h('div', { className: 'prompt-message' },
                             h('p', null, prompt.message)
-                        ),
-                        h('div', { className: 'prompt-sender' },
-                            h('p', null, `From: ${prompt.senderPublicKey.substring(0, 20)}...`)
                         ),
                         h('div', { className: 'prompt-response' },
                             h('p', null, prompt.response || 'No response yet')

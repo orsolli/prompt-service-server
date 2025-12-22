@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"sync"
+
+	"github.com/google/uuid"
 )
 
 // PromptStore stores prompts and manages SSE connections
@@ -20,8 +22,9 @@ type SSEConnection struct {
 }
 
 type Prompt struct {
+	Id       string `json:"id"`
 	key      string
-	message  string
+	Message  string `json:"message"`
 	callback func(string)
 }
 
@@ -36,8 +39,9 @@ func (s *PromptStore) AddPrompt(key string, message string, callback func(string
 	s.mutex.Lock()
 
 	prompt := &Prompt{
+		Id:       uuid.New().String(),
 		key:      key,
-		message:  message,
+		Message:  message,
 		callback: callback,
 	}
 	s.prompts[key] = append(s.prompts[key], prompt)
@@ -49,7 +53,7 @@ func (s *PromptStore) GetPrompts() []*Prompt {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
-	var prompts []*Prompt
+	prompts := []*Prompt{}
 	for _, keyprompt := range s.prompts {
 		for _, prompt := range keyprompt {
 			prompts = append(prompts, prompt)
@@ -69,8 +73,7 @@ func (s *PromptStore) RemovePrompt(id string) {
 func (s *PromptStore) NotifySSEConnections(prompt *Prompt) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	event := fmt.Sprintf("event: %s\ndata: %s\n\n", "Prompt", prompt.message)
-	s.SendEventToConnections(prompt.key, event)
+	s.SendEventToConnections(prompt.key, "new_prompt", prompt.Message)
 }
 
 // Add this to PromptStore
@@ -100,14 +103,19 @@ func (s *PromptStore) RemoveSSEConnection(key string, connection *SSEConnection)
 	}
 }
 
-func (s *PromptStore) SendEventToConnections(key string, event string) {
+func (s *PromptStore) SendEventToConnections(key string, eventType string, data string) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
 	if connections, exists := s.connections[key]; exists {
 		for _, conn := range connections {
-			conn.writer.Write([]byte(event))
-			conn.flusher.Flush()
+			s.SendEvent(conn.writer, conn.flusher, eventType, data)
 		}
 	}
+}
+
+func (s *PromptStore) SendEvent(w http.ResponseWriter, flusher http.Flusher, eventType string, data string) {
+	event := fmt.Sprintf("data: {\"type\": \"%s\", \"content\": \"%s\"}\n\n", eventType, data)
+	w.Write([]byte(event))
+	flusher.Flush()
 }
