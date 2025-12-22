@@ -8,7 +8,3 @@ require github.com/golang-jwt/jwt/v5 v5.3.0
 
 require github.com/gorilla/mux v1.8.1
 
-require (
-	github.com/gorilla/securecookie v1.1.2 // indirect
-	github.com/gorilla/sessions v1.4.0 // indirect
-)

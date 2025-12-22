@@ -34,7 +34,6 @@ func NewPromptStore() *PromptStore {
 
 func (s *PromptStore) AddPrompt(key string, message string, callback func(string)) {
 	s.mutex.Lock()
-	defer s.mutex.Unlock()
 
 	prompt := &Prompt{
 		key:      key,
@@ -42,6 +41,7 @@ func (s *PromptStore) AddPrompt(key string, message string, callback func(string
 		callback: callback,
 	}
 	s.prompts[key] = append(s.prompts[key], prompt)
+	s.mutex.Unlock()
 	s.NotifySSEConnections(prompt)
 }
 

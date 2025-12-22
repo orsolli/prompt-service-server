@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"prompt-service-server/core"
+	"prompt-service-server/utils"
 )
 
 type PromptHandler struct {
@@ -34,26 +35,17 @@ func (h *PromptHandler) Post(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verify signature (this is a simplified version)
-	// In reality, you'd need to verify the signature against the public key
-	signature := r.Header.Get("Authorization")
-	if signature == "" {
-		http.Error(w, "Missing signature", http.StatusUnauthorized)
-		return
-	}
-
-	// Process the prompt (store in memory for now)
-	// In a real implementation, this would store the prompt and wait for response
-
-	// Simulate sending messages
+	signal := utils.NewSignal()
 	h.store.AddPrompt(
 		req.PublicKey,
 		req.Message,
 		func(response string) {
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(response))
+			signal.Signal(response)
 		},
 	)
+	response := signal.Wait()
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(response))
 }
 
 func (h *PromptHandler) Get(w http.ResponseWriter, r *http.Request) {
