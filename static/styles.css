@@ -54,3 +54,33 @@ body {
     border: 1px solid #ccc;
     border-radius: 4px;
 }
+
+.active-key-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 0.5em;
+}
+.active-key {
+    max-width: 100%;
+    display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-family: monospace;
+    font-size: 1.1em;
+    padding: 0.2em 0.5em;
+    border-radius: 4px;
+}
+@media (min-width: 900px) {
+    .active-key {
+        max-width: none;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
+    }
+}
+.copy-hint {
+    font-size: 0.9em;
+    color: #888;
+    margin-left: 0.5em;
+}

@@ -186,9 +186,28 @@ export function PromptList() {
         );
     }
 
+    // Copy key to clipboard handler
+    const handleCopyKey = () => {
+        if (activeKey?.publicKey) {
+            navigator.clipboard.writeText(activeKey.publicKey);
+        }
+    };
+
     return h('div', { className: 'container' },
         h('h1', null, 'Prompt Service'),
-        h('h2', null, `Active Key: ${activeKey?.publicKey.substring(0, 20)}...`),
+        h('div', { className: 'active-key-row' },
+            h('span', {
+                className: 'active-key',
+                title: activeKey?.publicKey,
+                onClick: handleCopyKey,
+                tabIndex: 0,
+                style: {
+                    cursor: 'pointer',
+                    outline: 'none',
+                }
+            }, activeKey?.publicKey || ''),
+            h('span', { className: 'copy-hint' }, ' (click to copy)')
+        ),
         h('div', { className: 'key-actions' },
             h('button', {
                 onClick: () => {
