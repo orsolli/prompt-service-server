@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"prompt-service-server/core"
@@ -38,13 +40,14 @@ func (h *PromptHandler) Post(w http.ResponseWriter, r *http.Request) {
 	}
 
 	signal := utils.NewSignal()
-	h.store.AddPrompt(
+
+	defer h.store.RemovePrompt(h.store.AddPrompt(
 		req.PublicKey,
 		req.Message,
 		func(response string) {
 			signal.Signal(response)
 		},
-	)
+	))
 	response := signal.Wait()
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(response))
@@ -54,7 +57,8 @@ func (h *PromptHandler) Get(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	keyHash := vars["id"]
 	// Authenticate and verify CSRF for this request
-	if _, err := AuthenticateAndVerifyCSRF(w, r, keyHash); err != nil {
+	key, err := AuthenticateAndVerifyCSRF(w, r, keyHash)
+	if err != nil {
 		// Error response already written by helper
 		return
 	}
@@ -65,5 +69,30 @@ func (h *PromptHandler) Get(w http.ResponseWriter, r *http.Request) {
 	// Return list of prompts
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(h.store.GetPrompts())
+	json.NewEncoder(w).Encode(h.store.GetPrompts(key, ""))
+}
+
+func (h *PromptHandler) Respond(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id := vars["id"]
+	var keyHash string
+	var prompt *core.Prompt
+	for _, p := range h.store.GetPrompts("", id) {
+		if p.Id == id {
+			prompt = p
+			hashedKey := sha256.Sum256([]byte(prompt.Key))
+			keyHash = hex.EncodeToString(hashedKey[:])
+			break
+		}
+	}
+
+	// Authenticate and verify CSRF for this request
+	if _, err := AuthenticateAndVerifyCSRF(w, r, keyHash); err != nil {
+		// Error response already written by helper
+		return
+	}
+
+	prompt.Callback(r.FormValue("response"))
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(prompt.Id))
 }

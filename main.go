@@ -1,47 +1,49 @@
 package main
 
 import (
-    "log"
-    "net/http"
+	"log"
+	"net/http"
+	"prompt-service-server/config"
+	"prompt-service-server/core"
+	"prompt-service-server/handlers"
+
 	"github.com/gorilla/mux"
-    "prompt-service-server/handlers"
-    "prompt-service-server/config"
-    "prompt-service-server/core"
 )
 
 func main() {
-    // Load config
-    cfg := config.LoadConfig()
+	// Load config
+	cfg := config.LoadConfig()
 
-    promptStore := core.NewPromptStore()
-    
-    // Initialize handlers
-    indexHandler := handlers.NewIndexHandler()
-    keyHandler := handlers.NewKeyHandler()
-    authHandler := handlers.NewAuthHandler()
-    promptHandler := handlers.NewPromptHandler(promptStore)
-    sseHandler := handlers.NewSSEHandler(promptStore)
-    
-    // Create router
-    r := mux.NewRouter()
-    
-     // This will serve files under http://localhost:8000/static/<filename>
-    r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
+	promptStore := core.NewPromptStore()
 
-    // API endpoints
-    r.HandleFunc("/", indexHandler.Get).Methods("GET")
-    r.HandleFunc("/key/{id}", keyHandler.Get).Methods("GET")
-    r.HandleFunc("/api/auth/{id}", authHandler.Get).Methods("GET")
-    r.HandleFunc("/api/prompts", promptHandler.Post).Methods("POST")
-    r.HandleFunc("/api/prompts", promptHandler.Get).Methods("GET")
-    r.HandleFunc("/api/sse/{id}", sseHandler.Get).Methods("GET")
-    
-    // Start server
-    port := cfg.Port
-    if port == "" {
-        port = "8080"
-    }
-    
-    log.Printf("Server starting on port %s", port)
-    log.Fatal(http.ListenAndServe(":"+port, r))
+	// Initialize handlers
+	indexHandler := handlers.NewIndexHandler()
+	keyHandler := handlers.NewKeyHandler()
+	authHandler := handlers.NewAuthHandler()
+	promptHandler := handlers.NewPromptHandler(promptStore)
+	sseHandler := handlers.NewSSEHandler(promptStore)
+
+	// Create router
+	r := mux.NewRouter()
+
+	// This will serve files under http://localhost:8000/static/<filename>
+	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
+
+	// API endpoints
+	r.HandleFunc("/", indexHandler.Get).Methods("GET")
+	r.HandleFunc("/key/{id}", keyHandler.Get).Methods("GET")
+	r.HandleFunc("/api/auth/{id}", authHandler.Get).Methods("GET")
+	r.HandleFunc("/api/prompts", promptHandler.Post).Methods("POST")
+	r.HandleFunc("/api/prompts/{id}", promptHandler.Respond).Methods("POST")
+	r.HandleFunc("/api/prompts/{id}", promptHandler.Get).Methods("GET")
+	r.HandleFunc("/api/sse/{id}", sseHandler.Get).Methods("GET")
+
+	// Start server
+	port := cfg.Port
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Printf("Server starting on port %s", port)
+	log.Fatal(http.ListenAndServe(":"+port, r))
 }

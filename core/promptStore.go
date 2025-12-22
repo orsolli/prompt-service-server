@@ -10,7 +10,7 @@ import (
 
 // PromptStore stores prompts and manages SSE connections
 type PromptStore struct {
-	prompts     map[string][]*Prompt
+	prompts     map[string]*Prompt
 	connections map[string][]*SSEConnection
 	mutex       sync.RWMutex
 }
@@ -22,40 +22,41 @@ type SSEConnection struct {
 }
 
 type Prompt struct {
-	Id       string `json:"id"`
-	key      string
-	Message  string `json:"message"`
-	callback func(string)
+	Id       string       `json:"id"`
+	Key      string       `json:"-"`
+	Message  string       `json:"message"`
+	Callback func(string) `json:"-"`
 }
 
 func NewPromptStore() *PromptStore {
 	return &PromptStore{
-		prompts:     make(map[string][]*Prompt),
+		prompts:     make(map[string]*Prompt),
 		connections: make(map[string][]*SSEConnection),
 	}
 }
 
-func (s *PromptStore) AddPrompt(key string, message string, callback func(string)) {
+func (s *PromptStore) AddPrompt(key string, message string, callback func(string)) string {
 	s.mutex.Lock()
 
 	prompt := &Prompt{
 		Id:       uuid.New().String(),
-		key:      key,
+		Key:      key,
 		Message:  message,
-		callback: callback,
+		Callback: callback,
 	}
-	s.prompts[key] = append(s.prompts[key], prompt)
+	s.prompts[prompt.Id] = prompt
 	s.mutex.Unlock()
 	s.NotifySSEConnections(prompt)
+	return prompt.Id
 }
 
-func (s *PromptStore) GetPrompts() []*Prompt {
+func (s *PromptStore) GetPrompts(key string, id string) []*Prompt {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
 	prompts := []*Prompt{}
-	for _, keyprompt := range s.prompts {
-		for _, prompt := range keyprompt {
+	for _, prompt := range s.prompts {
+		if prompt.Key == key || prompt.Id == id {
 			prompts = append(prompts, prompt)
 		}
 	}
@@ -73,7 +74,7 @@ func (s *PromptStore) RemovePrompt(id string) {
 func (s *PromptStore) NotifySSEConnections(prompt *Prompt) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	s.SendEventToConnections(prompt.key, "new_prompt", prompt.Message)
+	s.SendEventToConnections(prompt.Key, "new_prompt", prompt.Message)
 }
 
 // Add this to PromptStore

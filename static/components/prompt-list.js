@@ -143,30 +143,22 @@ export function PromptList() {
     // Handle response submission
     const handleResponse = async (promptId, response) => {
         try {
-            const responseText = response.trim();
-            if (!responseText) return;
-            
-            const responseJson = {
-                promptId,
-                response: responseText
-            };
-            
             const responseHeaders = {
-                'Content-Type': 'application/json',
-                'Authorization': await signMessage(activeKey, challenge)
+                'Content-Type': 'plain/text'
             };
             
             const res = await fetch(`/api/prompts/${promptId}`, {
                 method: 'POST',
                 headers: responseHeaders,
-                body: JSON.stringify(responseJson)
+                body: response,
+                credentials: 'same-origin'
             });
             
             if (res.ok) {
                 // Update prompt with response
                 setPrompts(prev => 
                     prev.map(prompt => 
-                        prompt.id === promptId ? {...prompt, response: responseText} : prompt
+                        prompt.id === promptId ? {...prompt, response: response || ' '} : prompt
                     )
                 );
             } else {
@@ -212,15 +204,13 @@ export function PromptList() {
             h('div', { className: 'prompts-list' },
                 prompts.map(prompt => 
                     h('div', { className: 'prompt-item' },
+                        h('hr', null),
                         h('div', { className: 'prompt-message' },
                             h('p', null, prompt.message)
                         ),
-                        h('div', { className: 'prompt-response' },
-                            h('p', null, prompt.response || 'No response yet')
-                        ),
                         h('div', { className: 'prompt-actions' },
                             prompt.response ? 
-                                h('p', null, 'Response submitted') :
+                                h('p', null, '-> ', prompt.response) :
                                 h('div', { className: 'response-form' },
                                     h('input', {
                                         type: 'text',
