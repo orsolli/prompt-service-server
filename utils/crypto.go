@@ -1,8 +1,6 @@
 package utils
 
 import (
-    "encoding/base64"
-    "crypto/rand"
     "errors"
     "time"
     "github.com/golang-jwt/jwt/v5"
@@ -45,18 +43,4 @@ func VerifyJWT(tokenString string) error {
     }
     
     return nil
-}
-
-func GenerateKeyPair() (string, string, error) {
-    // Generate a new keypair
-    // This is a simplified version - in reality, you'd use crypto/ed25519
-    
-    // Generate a random key
-    key := make([]byte, 32)
-    if _, err := rand.Read(key); err != nil {
-        return "", "", err
-    }
-    
-    // Return base64 encoded key
-    return base64.StdEncoding.EncodeToString(key), "", nil
 }

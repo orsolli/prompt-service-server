@@ -6,17 +6,21 @@ import (
 	"github.com/gorilla/mux"
     "prompt-service-server/handlers"
     "prompt-service-server/config"
+    "prompt-service-server/core"
 )
 
 func main() {
     // Load config
     cfg := config.LoadConfig()
+
+    promptStore := core.NewPromptStore()
     
     // Initialize handlers
     indexHandler := handlers.NewIndexHandler()
     keyHandler := handlers.NewKeyHandler()
-    promptHandler := handlers.NewPromptHandler()
-    sseHandler := handlers.NewSSEHandler()
+    authHandler := handlers.NewAuthHandler()
+    promptHandler := handlers.NewPromptHandler(promptStore)
+    sseHandler := handlers.NewSSEHandler(promptStore)
     
     // Create router
     r := mux.NewRouter()
@@ -27,6 +31,7 @@ func main() {
     // API endpoints
     r.HandleFunc("/", indexHandler.Get).Methods("GET")
     r.HandleFunc("/key/{id}", keyHandler.Get).Methods("GET")
+    r.HandleFunc("/api/auth/{id}", authHandler.Get).Methods("GET")
     r.HandleFunc("/api/prompts", promptHandler.Post).Methods("POST")
     r.HandleFunc("/api/prompts", promptHandler.Get).Methods("GET")
     r.HandleFunc("/api/sse/{id}", sseHandler.Get).Methods("GET")

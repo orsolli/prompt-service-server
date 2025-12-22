@@ -8,16 +8,17 @@ import { useKeyStore } from '../utils/storage-utils.js';
 export function PromptList() {
     const [keys, addKey, removeKey, loading] = useKeyStore();
     const [activeKey, setActiveKey] = useState(null);
-    const [csrfToken, setCsrfToken] = useState(document.headers);
+    const [challenge, setChallenge] = useState();
     const [prompts, setPrompts] = useState([]);
     const [error, setError] = useState('');
+    const [loadingChallenge, setLoadingChallenge] = useState(false);
     const [loadingPrompts, setLoadingPrompts] = useState(false);
     const [sse, setSse] = useState(null);
     const [keySelected, setKeySelected] = useState(false);
 
     // Check for cookie key and select it
     useEffect(() => {
-        if (loading) return;
+        if (!keys.length) return;
         const cookie = document.cookie;
         const cookieKey = cookie.match(/publicKey=([^;]+)/);
         if (cookieKey && cookieKey[1]) {
@@ -26,7 +27,13 @@ export function PromptList() {
                 const matchingKey = keys.find(k => k.publicKeyHash === publicKeyHash);
                 if (matchingKey) {
                     setActiveKey(matchingKey);
-                    setKeySelected(true);
+                    fetchChallenge(publicKeyHash).then((challenge) => {
+                        signMessage(matchingKey, challenge).then((signature) => {
+                            setKeySelected(true);
+                            document.cookie = `CSRFChallenge=${signature}; path=/api`;
+                            setupSSE(publicKeyHash);
+                        })
+                    });
                 } else {
                     // Redirect to root if no matching key
                     window.location.href = '/?hash=' + publicKeyHash;
@@ -38,21 +45,11 @@ export function PromptList() {
             window.location.href = '/';
             console.error("Missing publicKey cookie");
         }
-    }, [keys, loading]);
-
-    // Fetch prompts when key is selected
-    useEffect(() => {
-        if (keySelected && activeKey) {
-            fetchPrompts();
-            setupSSE();
-        }
-    }, [keySelected, activeKey]);
+    }, [keys]);
 
     // Setup SSE connection
-    const setupSSE = () => {
-        if (!activeKey) return;
-        
-        const eventSource = new EventSource(`/api/sse/${activeKey.publicKeyHash}`, {
+    const setupSSE = (publicKeyHash) => {
+        const eventSource = new EventSource(`/api/sse/${publicKeyHash}`, {
             withCredentials: true
         });
         
@@ -78,6 +75,31 @@ export function PromptList() {
         setSse(eventSource);
     };
 
+    // Fetch challenge from API
+    const fetchChallenge = async (publicKeyHash) => {
+        setLoadingChallenge(true);
+        try {
+            const response = await fetch(`/api/auth/${publicKeyHash}`, {
+                method: 'GET',
+                credentials: 'same-origin'
+            });
+            
+            if (response.ok) {
+                const data = await response.text();
+                setChallenge(data);
+                return data;
+            } else {
+                setError('Failed to fetch challenge');
+                throw response;
+            }
+        } catch (err) {
+            setError('Error fetching challenge');
+            throw err;
+        } finally {
+            setLoadingChallenge(false);
+        }
+    };
+
     // Fetch prompts from API
     const fetchPrompts = async () => {
         if (!activeKey) return;
@@ -86,9 +108,7 @@ export function PromptList() {
         try {
             const response = await fetch('/api/prompts', {
                 method: 'GET',
-                headers: {
-                    'Authorization': await signMessage(activeKey, csrfToken)
-                }
+                credentials: 'same-origin'
             });
             
             if (response.ok) {
@@ -123,21 +143,6 @@ export function PromptList() {
         return btoa(String.fromCharCode(...new Uint8Array(signature)));
     };
 
-    // Handle key selection
-    const handleKeySelect = async (keyData) => {
-        setActiveKey(keyData);
-        setKeySelected(true);
-    };
-
-    // Handle key removal
-    const handleRemoveKey = (keyHash) => {
-        removeKey(keyHash);
-        if (activeKey && activeKey.publicKeyHash === keyHash) {
-            setActiveKey(null);
-            setKeySelected(false);
-        }
-    };
-
     // Handle response submission
     const handleResponse = async (promptId, response) => {
         try {
@@ -151,7 +156,7 @@ export function PromptList() {
             
             const responseHeaders = {
                 'Content-Type': 'application/json',
-                'Authorization': await signMessage(activeKey, csrfToken)
+                'Authorization': await signMessage(activeKey, challenge)
             };
             
             const res = await fetch(`/api/prompts/${promptId}`, {
@@ -175,39 +180,6 @@ export function PromptList() {
         }
     };
 
-    // Handle new key generation
-    const handleGenerateKey = async () => {
-        try {
-            const keyPair = await generateKeyPair();
-            const publicKeyB64 = arrayBufferToBase64(keyPair.publicKey);
-            const privateKeyB64 = arrayBufferToBase64(keyPair.privateKey);
-            const publicKeyHash = await hashPublicKey(publicKeyB64);
-            
-            const keyData = {
-                publicKeyHash: publicKeyHash,
-                publicKey: publicKeyB64,
-                privateKey: privateKeyB64,
-                timestamp: Date.now()
-            };
-            
-            await addKey(keyData);
-            document.cookie = `publicKey=${publicKeyB64}; path=/`;
-            window.location.href = `/key/${publicKeyHash}`;
-        } catch (err) {
-            setError('Error generating key');
-        }
-    };
-
-    // Helper functions
-    const arrayBufferToBase64 = (buffer) => {
-        const bytes = new Uint8Array(buffer);
-        let binary = '';
-        for (let i = 0; i < bytes.byteLength; i++) {
-            binary += String.fromCharCode(bytes[i]);
-        }
-        return btoa(binary);
-    };
-
     const base64ToArrayBuffer = (base64) => {
         const binaryString = atob(base64);
         const bytes = new Uint8Array(binaryString.length);
@@ -218,7 +190,7 @@ export function PromptList() {
     };
 
     // Render UI
-    if (loading || !keySelected) {
+    if (loading || loadingChallenge) {
         return h('div', { className: 'container' },
             h('h1', null, 'Prompt Service'),
             h('p', null, 'Loading...')
@@ -227,11 +199,8 @@ export function PromptList() {
 
     return h('div', { className: 'container' },
         h('h1', null, 'Prompt Service'),
-        h('h2', null, `Active Key: ${activeKey.publicKey.substring(0, 20)}...`),
+        h('h2', null, `Active Key: ${activeKey?.publicKey.substring(0, 20)}...`),
         h('div', { className: 'key-actions' },
-            h('button', {
-                onClick: handleGenerateKey
-            }, 'Generate New Key'),
             h('button', {
                 onClick: () => {
                     document.cookie = 'publicKey=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';

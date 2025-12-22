@@ -3,11 +3,12 @@ import { hashPublicKey } from '../utils/crypto-utils.js';
 // Key storage hook
 export function useKeyStore() {
     const [keys, setKeys] = useState([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     // Initialize from storage
     useEffect(() => {
         const loadKeys = async () => {
             try {
+                setLoading(true);
                 // Try localStorage first
                 let storedKeys = [];
                 const storedKeysStr = localStorage.getItem('promptServiceKeys');
@@ -35,9 +36,9 @@ export function useKeyStore() {
                     }
                 }
                 setKeys(storedKeys);
-                setLoading(false);
             } catch (error) {
                 console.error('Error loading keys:', error);
+            } finally {
                 setLoading(false);
             }
         };
