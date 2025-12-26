@@ -2,12 +2,14 @@ package utils
 
 import (
 	"errors"
+	"prompt-service-server/config"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var jwtSecret = []byte("your-secret-key-here") // In production, use environment variable
+var cfg = config.LoadConfig()
+var jwtSecret = []byte(cfg.CSRFTokenSecret)
 
 type Claims struct {
 	KeyHash string `json:"key_hash"`
@@ -21,7 +23,7 @@ func GenerateCSRFToken(keyHash string) (string, error) {
 		KeyHash: keyHash, // This would be the user's public key hash
 		RegisteredClaims: jwt.RegisteredClaims{
 			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(5 * time.Minute)),
+			ExpiresAt: jwt.NewNumericDate(now.Add(time.Duration(cfg.CSRFTokenExpirySeconds) * time.Second)),
 		},
 	}
 
