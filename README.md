@@ -15,7 +15,7 @@ This webserver acts as a prompt service, enabling users to receive and respond t
   - If the private key is missing, the user is shown a form to input a private key.
   - The signed token is used as Authorization header to request `/api/prompts` and `/api/sse/{sha-256-hashed-public-key}`.
 - **Key Storage**:
-  - The "Keep me logged in" checkbox determines whether the private key is stored in `localStorage` or `sessionStorage`.
+  - The private key is stored in `localStorage` (persistent across sessions).
 ### **2. Prompt Handling**
 - **Posting Prompts**:
   - A POST request to `/api/prompts` must include:
@@ -27,68 +27,76 @@ This webserver acts as a prompt service, enabling users to receive and respond t
   - Users with a valid key establish an SSE connection to `/api/sse/{hashed-public-key}`.
   - Users can view open prompts at `/api/prompts` and respond to them via a dedicated interface.
 ### **3. Authentication**
+- **Cookie-Based Authentication**:
+  - **Public Key Cookie**: The public key is stored in a `publicKey` cookie (base64 encoded).
+  - **CSRF Token Cookie**: A JWT token is generated server-side and stored in a `CSRFToken` cookie.
+  - **Signature Cookie**: The client signs the CSRF token with their private key and stores the signature in a `CSRFChallenge` cookie (base64 encoded).
 - **Asymmetric Key Authentication**:
   - **Prompt POST**:
-    - Requires the public key of the expected responder.
-  - **Response POST**:
-    - Requires the public key and a digital signature of the response using the private key.
-    - The server validates the signature against the public key.
+    - Requires the public key of the expected responder in the request body.
   - **Prompts GET**:
-    - Requires a digital signature of the CSRF token using the private key.
-    - The server validates the signature against the public key.
-  - **CSRF Token Mechanism**:  
-    - The CSRF token is a **JWT (JSON Web Token)** signed by the server with a server-side secret key.  
-    - The JWT includes:  
-      - A unique identifier for the request.  
-      - An expiration timestamp (e.g., 5 minutes from issuance).  
-      - A hash of the user's public key (to associate the token with the user).  
-    - The client receives the whole token to sign using the client's private key.  
-    - The server validates:  
-      1. The JWT's **server-side signature** (to ensure the token was issued by the server).  
-      2. The **client's signature** of the JWT (to prove ownership of the private key).  
-    - If both signatures are valid, the request is processed; otherwise, it is rejected.  
-  - **Client Behavior**:  
-    - The client does not need to know the JWT's internal structure.  
-    - The client must sign the whole JWT with its private key and send it as part of the request.  
-  - **Server Behavior**:  
-    - The server generates the JWT with its own secret key.  
-    - The server verifies the client's signature against the client's public key.  
-    - The server checks the JWT's expiration and ensures the public key hash matches the user's public key.  
+    - Requires valid `publicKey`, `CSRFToken`, and `CSRFChallenge` cookies.
+    - The server verifies the signature against the public key.
+  - **SSE Connection**:
+    - Requires valid cookies for authentication.
+- **CSRF Token Mechanism**:  
+  - The CSRF token is a **JWT (JSON Web Token)** signed by the server with a server-side secret key.  
+  - The JWT includes:  
+    - A hash of the user's public key .  
+    - An expiration timestamp (e.g., 5 minutes from issuance).  
+  - The client receives the token via `/api/auth/{id}` and stores it in a cookie.  
+  - The client signs the JWT with its private key and stores the signature in a cookie.  
+  - The server validates:  
+    1. The JWT's **server-side signature** (to ensure the token was issued by the server).  
+    2. The **client's signature** of the JWT (to prove ownership of the private key).  
+- **Client Behavior**:  
+  - The client automatically fetches the CSRF token, signs it, and sets the signature cookie.  
+  - Authentication is handled transparently in the background.  
+- **Server Behavior**:  
+  - The server generates the JWT with its own secret key and the user's public key hash.  
+  - The server verifies the client's signature against the client's public key.  
+  - The server checks the JWT's expiration.  
 ---
 ## **User Scenarios**
 ### **1. New User (Alice)**
-- Visits `/` with no `localStorage`.
-- Clicks new key button.
-- Keypair is generated locally using javascript and stored in `localStorage`.
-- Redirected to `/key/{hashed-public-key}` with public key in a cookie.
+- Visits `/` with no `localStorage` keys.
+- Clicks "Generate New Key" button.
+- Keypair is generated locally using JavaScript Ed25519 and stored in `localStorage`.
+- Public key is set in a cookie.
+- Automatically redirected to `/key/{hashed-public-key}`.
+- Client automatically fetches CSRF token, signs it, establishes SSE connection, and loads prompts.
+
 ### **2. Returning User (Bob)**
-- Visits `/` with a key in `localStorage`.
-- Click on `/key/{hashed-public-key}` with public key in a cookie.
-- Accesses `/api/prompts` and SSE connection.
-- Automatically passes the challenge (since the private key is available).
+- Visits `/` with keys in `localStorage`.
+- Clicks on a key link or the system automatically detects the cookie.
+- Redirected to `/key/{hashed-public-key}` with public key in cookie.
+- Client automatically verifies the key matches stored keys, fetches and signs CSRF token, establishes SSE connection, and loads prompts.
+
 ### **3. Externally Keyed User (Charlie)**
 - Visits `/`.
-- Uploads a pre-generated keypair (via file or string inputs).
-- Private key is not stored in `localStorage` (unless "Keep me logged in" is selected).
-- Redirected to `/key/{hashed-public-key}` with public key in a cookie.
-- Is asked to provide private key (to store in `sessionStorage` if not in `localStorage`).
-- Accesses `/api/prompts` and SSE connection.
-- Passes the challenge (since the private key is available in either `sessionStorage` or `localStorage`).
+- Uses the import form to upload a pre-generated Ed25519 keypair.
+- Private key is stored in `localStorage`.
+- Public key is set in a cookie.
+- Automatically redirected to `/key/{hashed-public-key}`.
+- Client automatically fetches CSRF token, signs it, establishes SSE connection, and loads prompts.
+
 ### **4. Digital User (Hal)**
 - Posts a prompt to `/api/prompts` with a public key.
-- The user (Alice/Bob/Charlie) receives the prompt via SSE.
-- Responds via the `/api/prompts` interface.
-- The response is signed and sent to the server.
-- The server sends a reply to Hal's original post to `/api/prompts`.
+- The user (Alice/Bob/Charlie) receives the prompt via automatic SSE updates.
+- Responds via the prompt interface.
+- The response is sent as plain text.
+- The server sends a reply to Hal's original POST request.
 ---
 ## **Endpoints**
 | Endpoint            | Method | Description |
 |-----------------|---------|-------------|
-| `/`                      | GET    | Redirects based on user state (new/returning/external). |
-| `/key/{id}`         | GET    | Verifies ownership of the public key via challenge. |
-| `/api/prompts`  | POST   | Posts a prompt for a specific public key. |
-| `/api/prompts`  | GET    | return a list of open prompts for the user's public key. |
-| `/api/sse/{id}`   | GET    | Establishes an SSE connection for real-time prompt updates. |
+| `/`                      | GET    | Serves the main application interface. |
+| `/key/{id}`         | GET    | Verifies ownership of the public key and serves the prompt interface. |
+| `/api/auth/{id}`   | GET    | Returns a CSRF token for authentication. |
+| `/api/prompts`     | POST   | Posts a prompt for a specific public key. |
+| `/api/prompts/{id}`| GET    | Returns a list of open prompts for the specified key hash. |
+| `/api/prompts/{id}`| POST   | Submits a response to a specific prompt. |
+| `/api/sse/{id}`    | GET    | Establishes an SSE connection for real-time prompt updates. |
 ---
 ```mermaid
 graph TD
@@ -111,7 +119,7 @@ graph TD
     GET_LIST["/api/prompts"] --> LIST["List prompts"]
     LISTEN["/api/sse/{hashed-key}"] --> LIST["List prompts"]
     LIST["List prompts"] --> CONFIRM["Confirm prompt"]
-    CONFIRM["Confirm prompt"] -->|Sign response with private key| POST_CON["POST /api/prompts/{id}"]
+    CONFIRM["Confirm prompt"] -->|Send response| POST_CON["POST /api/prompts/{id}"]
     U["User (Hal)"] -->|Post prompt| POST_PRO["POST /api/prompts"]
     POST_CON["POST /api/prompts/{id}"] -.->|Server sends reply to original poster| CORE_STO["Store prompt, wait for response"]
     POST_PRO["POST /api/prompts"] --> CORE_STO["Store prompt, wait for response"]
@@ -194,53 +202,32 @@ paths:
               schema:
                 type: object
                 properties:
-                  error:
-                    type: string
-                    example: "Public key not found in cookie. Please enter your public key."
-  /api/prompts:
+  /api/auth/{hash}:
     get:
-      summary: Return list of open prompts
+      summary: Get CSRF token for authentication
       parameters:
-        - name: Authorization
-          in: header
+        - name: hash
+          in: path
           required: true
-          description: Challenge signed by client's private key
+          description: SHA-256 hash of public key
           schema:
             type: string
       responses:
         200:
-          description: List of open prompts
-          content:
-            application/json:
+          description: CSRF token returned and set as cookie
+          headers:
+            Set-Cookie:
               schema:
-                type: array
-                items:
-                  type: object
-                  properties:
-                    id:
-                      type: string
-                      description: Unique prompt ID
-                    message:
-                      type: string
-                    senderPublicKey:
-                      type: string
-                    issued:
-                      type: string
-              example:
-                - id: "12345"
-                  message: "What is the answer to life?"
-                  senderPublicKey: "AQIDBA=="
-                  issued: "2024-06-06T04:30:00.000Z"
-        403:
-          description: Challenge failed
+                type: string
+              description: CSRFToken cookie containing JWT
           content:
-            application/json:
+            text/plain:
               schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Challenge failed. Please enter your private key."
+                type: string
+              example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        400:
+          description: Invalid public key cookie
+  /api/prompts:
     post:
       summary: Post a prompt for a specific public key
       requestBody:
@@ -286,6 +273,68 @@ paths:
                 type: string
                 description: The prompt response
               example: "User did not confirm the prompt in time"
+  /api/prompts/{hash}:
+    get:
+      summary: Return list of open prompts for the specified key hash
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          description: SHA-256 hash of public key
+          schema:
+            type: string
+      responses:
+        200:
+          description: List of open prompts
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                      description: Unique prompt ID
+                    message:
+                      type: string
+                    senderPublicKey:
+                      type: string
+                    issued:
+                      type: string
+              example:
+                - id: "12345"
+                  message: "What is the answer to life?"
+                  senderPublicKey: "AQIDBA=="
+                  issued: "2024-06-06T04:30:00.000Z"
+        401:
+          description: Authentication failed
+    post:
+      summary: Submit response to a specific prompt
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          description: SHA-256 hash of public key
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          text/plain:
+            schema:
+              type: string
+            description: The response text
+      responses:
+        200:
+          description: Response submitted successfully
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: "12345"
+        401:
+          description: Authentication failed
   /api/sse/{hash}:
     get:
       summary: Establish SSE connection for real-time updates
@@ -296,28 +345,15 @@ paths:
           description: SHA-256 hash of public key
           schema:
             type: string
-        - name: Authorization
-          in: header
-          required: true
-          description: Challenge signed by client's private key
-          schema:
-            type: string
       responses:
         200:
           description: SSE connection established
           content:
             text/event-stream:
               example: |
-                data: {"type": "new_prompt", "id": "12345", "message": "What is the answer to life?"}
-                data: {"type": "response_received", "promptId": "12345", "response": "42"}
-        403:
-          description: Challenge failed
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  error:
-                    type: string
-                    example: "Challenge failed. Please enter your private key."
+                data: {"type": "connected", "content": "Connection established"}
+                data: {"type": "new_prompt", "content": "What is the answer to life?"}
+                data: {"type": "prompt_responded", "content": "12345:42"}
+        401:
+          description: Authentication failed
 ```
