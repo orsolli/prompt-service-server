@@ -242,9 +242,9 @@ func TestSSEHandler_Get_Authenticated(t *testing.T) {
 
 	// Check that the initial "connected" event was sent
 	responseBody := w.Body.String()
-	assert.Contains(t, responseBody, `"type": "connected"`)
-	assert.Contains(t, responseBody, `"content": "Connection established"`)
-	assert.Contains(t, responseBody, `"id": "`+pubKeyB64+`"`) // The connected event includes the public key as id
+	assert.Contains(t, responseBody, `"type":"connected"`)
+	assert.Contains(t, responseBody, `"content":"Connection established"`)
+	assert.Contains(t, responseBody, `"id":"`+pubKeyB64+`"`) // The connected event includes the public key as id
 }
 
 func TestSSE_PromptNotification_Integration(t *testing.T) {
@@ -296,8 +296,8 @@ func TestSSE_PromptNotification_Integration(t *testing.T) {
 
 	// Verify SSE connection was established
 	sseResponse := sseW.Body.String()
-	assert.Contains(t, sseResponse, `"type": "connected"`)
-	assert.Contains(t, sseResponse, `"content": "Connection established"`)
+	assert.Contains(t, sseResponse, `"type":"connected"`)
+	assert.Contains(t, sseResponse, `"content":"Connection established"`)
 
 	// Post a prompt for the same user
 	reqBody := map[string]string{
@@ -332,15 +332,15 @@ func TestSSE_PromptNotification_Integration(t *testing.T) {
 			t.Fatal("Timeout waiting for prompt notification")
 		case <-ticker.C:
 			currentResponse := sseW.Body.String()
-			if strings.Contains(currentResponse, `"type": "new_prompt"`) &&
-				strings.Contains(currentResponse, `"content": "Test prompt for SSE notification"`) {
+			if strings.Contains(currentResponse, `"type":"new_prompt"`) &&
+				strings.Contains(currentResponse, `"content":"Test prompt for SSE notification"`) {
 				// Extract prompt ID from the JSON event
 				lines := strings.Split(currentResponse, "\n")
 				for _, line := range lines {
-					if strings.Contains(line, `"type": "new_prompt"`) &&
-						strings.Contains(line, `"content": "Test prompt for SSE notification"`) {
+					if strings.Contains(line, `"type":"new_prompt"`) &&
+						strings.Contains(line, `"content":"Test prompt for SSE notification"`) {
 						// Parse the JSON to extract the ID
-						// Format: data: {"type": "new_prompt", "content": "...", "id": "uuid"}
+						// Format: data: {"type":"new_prompt", "content":"...", "id":"uuid"}
 						jsonStart := strings.Index(line, "{")
 						if jsonStart != -1 {
 							jsonStr := line[jsonStart:]

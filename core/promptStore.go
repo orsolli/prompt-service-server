@@ -117,8 +117,13 @@ func (s *PromptStore) SendEventToConnections(key string, eventType string, data 
 }
 
 func (s *PromptStore) SendEvent(w http.ResponseWriter, flusher http.Flusher, eventType string, data string, id string) {
-	escapedData, _ := json.Marshal(data)
-	event := fmt.Sprintf("data: {\"type\": \"%s\", \"content\": %s, \"id\": \"%s\"}\n\n", eventType, escapedData, id)
+	eventData := map[string]string{
+		"type":    eventType,
+		"content": data,
+		"id":      id,
+	}
+	jsonData, _ := json.Marshal(eventData)
+	event := fmt.Sprintf("data: %s\n\n", jsonData)
 	w.Write([]byte(event))
 	flusher.Flush()
 }

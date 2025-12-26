@@ -156,9 +156,9 @@ func TestSendEventToConnections(t *testing.T) {
 	store.SendEventToConnections(key, "test_event", "test data", "test-id")
 
 	// Verify event was sent
-	assert.Contains(t, string(w.data), `"type": "test_event"`)
-	assert.Contains(t, string(w.data), `"content": "test data"`)
-	assert.Contains(t, string(w.data), `"id": "test-id"`)
+	assert.Contains(t, string(w.data), `"type":"test_event"`)
+	assert.Contains(t, string(w.data), `"content":"test data"`)
+	assert.Contains(t, string(w.data), `"id":"test-id"`)
 }
 
 func TestSendEvent(t *testing.T) {
@@ -172,9 +172,9 @@ func TestSendEvent(t *testing.T) {
 	// Verify event format
 	eventData := string(w.data)
 	assert.True(t, strings.HasPrefix(eventData, "data: "))
-	assert.Contains(t, eventData, `"type": "test_event"`)
-	assert.Contains(t, eventData, `"content": "test data"`)
-	assert.Contains(t, eventData, `"id": "test-id"`)
+	assert.Contains(t, eventData, `"type":"test_event"`)
+	assert.Contains(t, eventData, `"content":"test data"`)
+	assert.Contains(t, eventData, `"id":"test-id"`)
 	assert.True(t, strings.HasSuffix(eventData, "\n\n"))
 }
 
@@ -196,6 +196,6 @@ func TestNotifySSEConnections(t *testing.T) {
 	store.NotifySSEConnections(prompt)
 
 	// Verify notification was sent
-	assert.Contains(t, string(w.data), `"type": "new_prompt"`)
-	assert.Contains(t, string(w.data), `"content": "test message"`)
+	assert.Contains(t, string(w.data), `"type":"new_prompt"`)
+	assert.Contains(t, string(w.data), `"content":"test message"`)
 }

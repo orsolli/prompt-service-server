@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
@@ -36,6 +37,12 @@ func (h *PromptHandler) Post(w http.ResponseWriter, r *http.Request) {
 	// Validate required fields
 	if req.PublicKey == "" || req.Message == "" {
 		http.Error(w, "Missing public_key or message", http.StatusBadRequest)
+		return
+	}
+
+	// Validate PublicKey is valid base64
+	if _, err := base64.StdEncoding.DecodeString(req.PublicKey); err != nil {
+		http.Error(w, "Invalid public_key format", http.StatusBadRequest)
 		return
 	}
 
