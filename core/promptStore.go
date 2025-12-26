@@ -75,7 +75,7 @@ func (s *PromptStore) RemovePrompt(id string) {
 func (s *PromptStore) NotifySSEConnections(prompt *Prompt) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
-	s.SendEventToConnections(prompt.Key, "new_prompt", prompt.Message)
+	s.SendEventToConnections(prompt.Key, "new_prompt", prompt.Message, prompt.Id)
 }
 
 // Add this to PromptStore
@@ -105,20 +105,20 @@ func (s *PromptStore) RemoveSSEConnection(key string, connection *SSEConnection)
 	}
 }
 
-func (s *PromptStore) SendEventToConnections(key string, eventType string, data string) {
+func (s *PromptStore) SendEventToConnections(key string, eventType string, data string, id string) {
 	s.mutex.RLock()
 	defer s.mutex.RUnlock()
 
 	if connections, exists := s.connections[key]; exists {
 		for _, conn := range connections {
-			s.SendEvent(conn.writer, conn.flusher, eventType, data)
+			s.SendEvent(conn.writer, conn.flusher, eventType, data, id)
 		}
 	}
 }
 
-func (s *PromptStore) SendEvent(w http.ResponseWriter, flusher http.Flusher, eventType string, data string) {
+func (s *PromptStore) SendEvent(w http.ResponseWriter, flusher http.Flusher, eventType string, data string, id string) {
 	escapedData, _ := json.Marshal(data)
-	event := fmt.Sprintf("data: {\"type\": \"%s\", \"content\": %s}\n\n", eventType, escapedData)
+	event := fmt.Sprintf("data: {\"type\": \"%s\", \"content\": %s, \"id\": \"%s\"}\n\n", eventType, escapedData, id)
 	w.Write([]byte(event))
 	flusher.Flush()
 }

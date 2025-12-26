@@ -89,13 +89,14 @@ func (h *PromptHandler) Respond(w http.ResponseWriter, r *http.Request) {
 	// Authenticate and verify CSRF for this request
 	if _, err := AuthenticateAndVerifyCSRF(w, r, keyHash); err != nil {
 		// Error response already written by helper
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	response := make([]byte, r.ContentLength)
 	r.Body.Read(response)
 	prompt.Callback(string(response))
-	h.store.SendEventToConnections(prompt.Key, "prompt_responded", prompt.Id+":"+string(response))
+	h.store.SendEventToConnections(prompt.Key, "prompt_responded", string(response), prompt.Id)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(prompt.Id))
 }

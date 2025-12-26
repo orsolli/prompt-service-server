@@ -47,7 +47,7 @@ func (h *SSEHandler) Get(w http.ResponseWriter, r *http.Request) {
 	connection := h.store.AddSSEConnection(cookieKey, w, flusher)
 
 	// Send initial connection confirmation
-	h.store.SendEvent(w, flusher, "connected", "Connection established")
+	h.store.SendEvent(w, flusher, "connected", "Connection established", cookieKey)
 
 	// Keep connection alive
 	ticker := time.NewTicker(60 * time.Second)
@@ -57,7 +57,7 @@ func (h *SSEHandler) Get(w http.ResponseWriter, r *http.Request) {
 		select {
 		case <-ticker.C:
 			// Send heartbeat
-			h.store.SendEvent(w, flusher, "heartbeat", "alive")
+			h.store.SendEvent(w, flusher, "heartbeat", "alive", cookieKey)
 		case <-r.Context().Done():
 			// Remove connection
 			h.store.RemoveSSEConnection(cookieKey, connection)

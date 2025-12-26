@@ -86,10 +86,11 @@ export function PromptList() {
             } else if (data.type === 'new_prompt') {
                 fetchPrompts(publicKeyHash);
             } else if (data.type === 'prompt_responded') {
-                const [ promptId, ...response ] = data.content.split(':');
+                const promptId = data.id;
+                const response = data.content;
                 setPrompts(prev => 
                     prev.map(prompt => 
-                        prompt.id === promptId ? {...prompt, response: response.join(':') || ' '} : prompt
+                        prompt.id === promptId ? {...prompt, response: response || ' '} : prompt
                     )
                 );
             }
