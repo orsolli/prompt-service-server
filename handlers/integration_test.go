@@ -11,6 +11,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -241,5 +242,156 @@ func TestSSEHandler_Get_Authenticated(t *testing.T) {
 
 	// Check that the initial "connected" event was sent
 	responseBody := w.Body.String()
-	assert.Contains(t, responseBody, `data: {"type": "connected", "content": "Connection established"}`)
+	assert.Contains(t, responseBody, `"type": "connected"`)
+	assert.Contains(t, responseBody, `"content": "Connection established"`)
+	assert.Contains(t, responseBody, `"id": "`+pubKeyB64+`"`) // The connected event includes the public key as id
+}
+
+func TestSSE_PromptNotification_Integration(t *testing.T) {
+	router := setupTestRouter()
+
+	// Generate keypair for proper authentication
+	pub, priv, err := ed25519.GenerateKey(rand.Reader)
+	require.NoError(t, err)
+
+	pubKeyB64 := base64.StdEncoding.EncodeToString(pub)
+	hashedKey := sha256.Sum256([]byte(pubKeyB64))
+	keyHash := hex.EncodeToString(hashedKey[:])
+
+	// Create JWT and signature
+	token, err := utils.GenerateCSRFToken(keyHash)
+	require.NoError(t, err)
+
+	signature := ed25519.Sign(priv, []byte(token))
+	sigB64 := base64.StdEncoding.EncodeToString(signature)
+
+	// Set up cookies for all requests
+	cookies := []*http.Cookie{
+		{Name: "publicKey", Value: pubKeyB64},
+		{Name: "CSRFToken", Value: token},
+		{Name: "CSRFChallenge", Value: sigB64},
+	}
+
+	// Start SSE connection with reasonable timeout
+	sseReq := httptest.NewRequest("GET", "/api/sse/"+keyHash, nil)
+	for _, cookie := range cookies {
+		sseReq.AddCookie(cookie)
+	}
+
+	sseCtx, sseCancel := context.WithTimeout(sseReq.Context(), 5*time.Second)
+	defer sseCancel()
+	sseReq = sseReq.WithContext(sseCtx)
+
+	sseW := httptest.NewRecorder()
+
+	// Start SSE handler in goroutine
+	sseDone := make(chan bool, 1)
+	go func() {
+		defer func() { sseDone <- true }()
+		router.ServeHTTP(sseW, sseReq)
+	}()
+
+	// Give SSE connection time to establish and send initial event
+	time.Sleep(50 * time.Millisecond)
+
+	// Verify SSE connection was established
+	sseResponse := sseW.Body.String()
+	assert.Contains(t, sseResponse, `"type": "connected"`)
+	assert.Contains(t, sseResponse, `"content": "Connection established"`)
+
+	// Post a prompt for the same user
+	reqBody := map[string]string{
+		"public_key": pubKeyB64,
+		"message":    "Test prompt for SSE notification",
+	}
+	body, _ := json.Marshal(reqBody)
+
+	promptReq := httptest.NewRequest("POST", "/api/prompts", bytes.NewReader(body))
+	promptReq.Header.Set("Content-Type", "application/json")
+
+	promptW := httptest.NewRecorder()
+
+	// Start prompt posting in a goroutine that will respond to the prompt
+	promptDone := make(chan string, 1)
+	go func() {
+		// This will block until we respond to the prompt
+		router.ServeHTTP(promptW, promptReq)
+		promptDone <- promptW.Body.String()
+	}()
+
+	// Wait for the prompt to be posted and notification to be sent
+	// The SSE should receive a "new_prompt" event
+	maxWait := time.After(2 * time.Second)
+	ticker := time.NewTicker(50 * time.Millisecond)
+	defer ticker.Stop()
+
+	var promptId string
+	for {
+		select {
+		case <-maxWait:
+			t.Fatal("Timeout waiting for prompt notification")
+		case <-ticker.C:
+			currentResponse := sseW.Body.String()
+			if strings.Contains(currentResponse, `"type": "new_prompt"`) &&
+				strings.Contains(currentResponse, `"content": "Test prompt for SSE notification"`) {
+				// Extract prompt ID from the JSON event
+				lines := strings.Split(currentResponse, "\n")
+				for _, line := range lines {
+					if strings.Contains(line, `"type": "new_prompt"`) &&
+						strings.Contains(line, `"content": "Test prompt for SSE notification"`) {
+						// Parse the JSON to extract the ID
+						// Format: data: {"type": "new_prompt", "content": "...", "id": "uuid"}
+						jsonStart := strings.Index(line, "{")
+						if jsonStart != -1 {
+							jsonStr := line[jsonStart:]
+							var event map[string]interface{}
+							if err := json.Unmarshal([]byte(jsonStr), &event); err == nil {
+								if id, ok := event["id"].(string); ok && id != "" {
+									promptId = id
+									goto foundPrompt
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+foundPrompt:
+
+	// Now respond to the prompt with proper authentication
+	respondReq := httptest.NewRequest("POST", "/api/prompts/"+promptId, bytes.NewReader([]byte("test response")))
+	for _, cookie := range cookies {
+		respondReq.AddCookie(cookie)
+	}
+	respondReq.Header.Set("Content-Type", "text/plain")
+
+	respondW := httptest.NewRecorder()
+
+	// Post the response
+	router.ServeHTTP(respondW, respondReq)
+
+	// The response should be successful
+	assert.Equal(t, http.StatusOK, respondW.Code)
+	assert.Equal(t, promptId, strings.TrimSpace(respondW.Body.String()))
+
+	// Wait for the prompt posting goroutine to complete
+	select {
+	case response := <-promptDone:
+		assert.Equal(t, "test response", response)
+	case <-time.After(1 * time.Second):
+		t.Fatal("Prompt posting did not complete")
+	}
+
+	// Cancel the SSE context to stop the connection
+	sseCancel()
+
+	// Wait for SSE to finish
+	select {
+	case <-sseDone:
+		// SSE finished cleanly
+	case <-time.After(500 * time.Millisecond):
+		t.Log("SSE did not finish cleanly, but that's expected due to context cancellation")
+	}
 }
