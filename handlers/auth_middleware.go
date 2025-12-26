@@ -6,11 +6,11 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"net/http"
+	"prompt-service-server/utils"
 )
 
-// AuthenticateAndVerifyCSRF checks the publicKey cookie, verifies it matches the keyHash,
-// and validates the CSRF token and signature. Returns the decoded public key if valid, or writes an error/redirect and returns error.
-func AuthenticateAndVerifyCSRF(w http.ResponseWriter, r *http.Request, keyHash string) (string, error) {
+// VerifyKeyHash checks the publicKey cookie, verifies it matches the keyHash,
+func VerifyKeyHash(w http.ResponseWriter, r *http.Request, keyHash string) (string, error) {
 	cookie, err := r.Cookie("publicKey")
 	if err != nil {
 		http.Redirect(w, r, "/", http.StatusFound)
@@ -22,6 +22,16 @@ func AuthenticateAndVerifyCSRF(w http.ResponseWriter, r *http.Request, keyHash s
 		http.Redirect(w, r, "/", http.StatusFound)
 		return cookieKey, http.ErrNoCookie
 	}
+	return cookieKey, nil
+}
+
+// AuthenticateAndVerifyCSRF checks the publicKey cookie, verifies it matches the keyHash,
+// and validates the CSRF token and signature. Returns the decoded public key if valid, or writes an error/redirect and returns error.
+func AuthenticateAndVerifyCSRF(w http.ResponseWriter, r *http.Request, keyHash string) (string, error) {
+	cookieKey, err := VerifyKeyHash(w, r, keyHash)
+	if err != nil {
+		return "", err
+	}
 	signature, err := r.Cookie("CSRFChallenge")
 	if err != nil {
 		http.Error(w, "Missing signature", http.StatusUnauthorized)
@@ -32,6 +42,13 @@ func AuthenticateAndVerifyCSRF(w http.ResponseWriter, r *http.Request, keyHash s
 		http.Error(w, "Missing token", http.StatusUnauthorized)
 		return cookieKey, err
 	}
+	// Authenticate CSRF token
+	jwtError := utils.VerifyJWT(token.Value)
+	if jwtError != nil {
+		http.Error(w, "Invalid token", http.StatusUnauthorized)
+		return cookieKey, jwtError
+	}
+	// Verify signature
 	publicKey, err := base64.StdEncoding.DecodeString(cookieKey)
 	if err != nil {
 		http.Error(w, "Failed to decode", http.StatusUnauthorized)
