@@ -1,51 +1,74 @@
 // components/prompt-list.js
 import { h } from 'https://esm.sh/preact';
-import { useState, useEffect } from 'https://esm.sh/preact/hooks';
-import { generateKeyPair } from '../utils/key-utils.js';
+import { useState } from 'https://esm.sh/preact/hooks';
+import { signMessage } from '../utils/key-utils.js';
 import { hashPublicKey } from '../utils/crypto-utils.js';
 import { useKeyStore } from '../utils/storage-utils.js';
 
 export function PromptList() {
-    const [keys, addKey, removeKey, loading] = useKeyStore();
     const [activeKey, setActiveKey] = useState(null);
-    const [challenge, setChallenge] = useState();
     const [prompts, setPrompts] = useState([]);
     const [error, setError] = useState('');
     const [loadingChallenge, setLoadingChallenge] = useState(false);
     const [loadingPrompts, setLoadingPrompts] = useState(false);
-    const [sse, setSse] = useState(null);
-    const [keySelected, setKeySelected] = useState(false);
+    const [sseConnection, setSSEConnection] = useState(null);
 
-    // Check for cookie key and select it
-    useEffect(() => {
-        if (!keys.length) return;
+    // Fetch challenge from API
+    const fetchChallenge = async (publicKeyHash) => {
+        const response = await fetch(`/api/auth/${publicKeyHash}`, {
+            method: 'GET',
+            credentials: 'same-origin'
+        });
+        
+        if (response.ok) {
+            const data = await response.text();
+            return data;
+        } else {
+            setError('Failed to fetch challenge');
+            throw response;
+        }
+    };
+
+    const signChallenge = async (activeKey) => {
+        setLoadingChallenge(true);
+        try {
+            const challenge = await fetchChallenge(activeKey.publicKeyHash);
+            const signature = await signMessage(activeKey, challenge);
+            document.cookie = `CSRFChallenge=${signature}; path=/api; max-age=300`;
+            if (!sseConnection || sseConnection.readyState === EventSource.CLOSED) {
+                setSSEConnection(setupSSE(activeKey.publicKeyHash));
+            }
+        } catch (error) {
+            setError('Failed to sign challenge');
+        } finally {
+            setLoadingChallenge(false);
+        }
+    };
+
+    const initializeKey = async (keys) => {
         const cookie = document.cookie;
         const cookieKey = cookie.match(/publicKey=([^;]+)/);
         if (cookieKey && cookieKey[1]) {
             const publicKey = cookieKey[1];
-            hashPublicKey(publicKey).then((publicKeyHash) => {
-                const matchingKey = keys.find(k => k.publicKeyHash === publicKeyHash);
-                if (matchingKey) {
-                    setActiveKey(matchingKey);
-                    fetchChallenge(publicKeyHash).then((challenge) => {
-                        signMessage(matchingKey, challenge).then((signature) => {
-                            setKeySelected(true);
-                            document.cookie = `CSRFChallenge=${signature}; path=/api`;
-                            setupSSE(publicKeyHash);
-                        })
-                    });
-                } else {
-                    // Redirect to root if no matching key
-                    window.location.href = '/?hash=' + publicKeyHash;
-                    console.error("Wrong publicKey cookie");
-                }
-            });
+            const publicKeyHash = await hashPublicKey(publicKey);
+            const matchingKey = keys.find(k => k.publicKeyHash === publicKeyHash);
+            if (matchingKey) {
+                setActiveKey(matchingKey);
+                signChallenge(matchingKey)
+                setInterval(() => signChallenge(matchingKey), 4 * 60 * 1000); // Refresh every 4 minutes
+            } else {
+                // Redirect to root if no matching key
+                window.location.href = '/?hash=' + publicKeyHash;
+                console.error("Wrong publicKey cookie");
+            }
         } else {
             // Redirect to root if no cookie
             window.location.href = '/';
             console.error("Missing publicKey cookie");
         }
-    }, [keys]);
+    };
+
+    const [loading] = useKeyStore(initializeKey);
 
     // Setup SSE connection
     const setupSSE = (publicKeyHash) => {
@@ -75,33 +98,8 @@ export function PromptList() {
         eventSource.onerror = (error) => {
             console.error('SSE Error:', error);
         };
-        
-        setSse(eventSource);
-    };
 
-    // Fetch challenge from API
-    const fetchChallenge = async (publicKeyHash) => {
-        setLoadingChallenge(true);
-        try {
-            const response = await fetch(`/api/auth/${publicKeyHash}`, {
-                method: 'GET',
-                credentials: 'same-origin'
-            });
-            
-            if (response.ok) {
-                const data = await response.text();
-                setChallenge(data);
-                return data;
-            } else {
-                setError('Failed to fetch challenge');
-                throw response;
-            }
-        } catch (err) {
-            setError('Error fetching challenge');
-            throw err;
-        } finally {
-            setLoadingChallenge(false);
-        }
+        return eventSource;
     };
 
     // Fetch prompts from API
@@ -125,25 +123,6 @@ export function PromptList() {
         } finally {
             setLoadingPrompts(false);
         }
-    };
-
-    // Sign a message with the private key
-    const signMessage = async (keyData, message) => {
-        const encoder = new TextEncoder();
-        const data = encoder.encode(message);
-        
-        // Get the private key from localStorage or sessionStorage
-        const privateKey = keyData.privateKey;
-        const key = await crypto.subtle.importKey(
-            "pkcs8",
-            base64ToArrayBuffer(privateKey),
-            { name: "Ed25519" },
-            false,
-            ["sign"]
-        );
-        
-        const signature = await crypto.subtle.sign("Ed25519", key, data);
-        return btoa(String.fromCharCode(...new Uint8Array(signature)));
     };
 
     // Handle response submission
@@ -175,15 +154,6 @@ export function PromptList() {
         }
     };
 
-    const base64ToArrayBuffer = (base64) => {
-        const binaryString = atob(base64);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-        }
-        return bytes.buffer;
-    };
-
     // Render UI
     if (loading || loadingChallenge) {
         return h('div', { className: 'container' },
@@ -192,28 +162,21 @@ export function PromptList() {
         );
     }
 
-    // Copy key to clipboard handler
-    const handleCopyKey = () => {
-        if (activeKey?.publicKey) {
-            navigator.clipboard.writeText(activeKey.publicKey);
-        }
-    };
-
     return h('div', { className: 'container' },
         h('h1', null, 'Prompt Service'),
-        h('div', { className: 'active-key-row' },
+        activeKey?.publicKey ? h('div', { className: 'active-key-row' },
             h('span', {
                 className: 'active-key',
-                title: activeKey?.publicKey,
-                onClick: handleCopyKey,
+                title: activeKey.publicKey,
+                onClick: () => navigator.clipboard.writeText(activeKey.publicKey),
                 tabIndex: 0,
                 style: {
                     cursor: 'pointer',
                     outline: 'none',
                 }
-            }, activeKey?.publicKey || ''),
+            }, activeKey.publicKey || ''),
             h('span', { className: 'copy-hint' }, ' (click to copy)')
-        ),
+        ) : null,
         h('div', { className: 'key-actions' },
             h('button', {
                 onClick: () => {
@@ -221,6 +184,9 @@ export function PromptList() {
                     window.location.href = '/';
                 }
             }, 'Switch Key')
+        ),
+        h('div', null,
+            h('p', null, error)
         ),
         h('div', { className: 'prompts-container' },
             h('h3', null, 'Your Prompts'),

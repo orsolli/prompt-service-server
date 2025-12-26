@@ -1,12 +1,12 @@
 import { h } from 'https://esm.sh/preact';
-import { useState, useEffect } from 'https://esm.sh/preact/hooks';
+import { useState } from 'https://esm.sh/preact/hooks';
 import { KeyList } from './key-list.js';
 import { ImportForm } from './import-form.js';
 import { useKeyStore } from '../utils/storage-utils.js';
 import { generateKeyPair } from '../utils/key-utils.js';
 import { hashPublicKey } from '../utils/crypto-utils.js';
 export function App() {
-    const [keys, addKey, removeKey, loading] = useKeyStore();
+    const [loading, keys, addKey, removeKey] = useKeyStore();
     const [importOpen, setImportOpen] = useState(false);
     const [importText, setImportText] = useState('');
     const [publicKey, setPublicKey] = useState('');

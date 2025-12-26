@@ -50,7 +50,7 @@ func (h *SSEHandler) Get(w http.ResponseWriter, r *http.Request) {
 	h.store.SendEvent(w, flusher, "connected", "Connection established")
 
 	// Keep connection alive
-	ticker := time.NewTicker(5 * time.Second)
+	ticker := time.NewTicker(60 * time.Second)
 	defer ticker.Stop()
 
 	for {

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'https://esm.sh/preact/hooks';
 import { hashPublicKey } from '../utils/crypto-utils.js';
 // Key storage hook
-export function useKeyStore() {
+export function useKeyStore(callback) {
     const [keys, setKeys] = useState([]);
     const [loading, setLoading] = useState(false);
     // Initialize from storage
@@ -36,6 +36,9 @@ export function useKeyStore() {
                     }
                 }
                 setKeys(storedKeys);
+                if (callback) {
+                    callback(storedKeys);
+                }
             } catch (error) {
                 console.error('Error loading keys:', error);
             } finally {
@@ -68,5 +71,5 @@ export function useKeyStore() {
     const removeKey = (keyHash) => {
         setKeys(prev => prev.filter(k => k.publicKeyHash !== keyHash));
     };
-    return [keys, addKey, removeKey, loading];
+    return [loading, keys, addKey, removeKey];
 }
