@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'https://esm.sh/preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import { hashPublicKey } from '../utils/crypto-utils.js';
 // Key storage hook
 export function useKeyStore(callback) {

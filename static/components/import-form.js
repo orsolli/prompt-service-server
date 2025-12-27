@@ -1,4 +1,4 @@
-import { h } from 'https://esm.sh/preact';
+import { h } from 'preact';
 export function ImportForm({
     importText,
     setImportText,

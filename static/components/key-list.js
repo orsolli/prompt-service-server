@@ -1,4 +1,4 @@
-import { h } from 'https://esm.sh/preact';
+import { h } from 'preact';
 import { KeyItem } from './key-item.js';
 export function KeyList({ keys, removeKey }) {
     if (keys.length === 0) {

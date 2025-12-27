@@ -1,6 +1,41 @@
 ## **System Overview**
 This webserver acts as a prompt service, enabling users to receive and respond to prompts without relying on `window.prompt`. It uses asymmetric cryptography for authentication and secure communication. The system supports three types of users: new users, returning users, and users with externally generated keys.
 ---
+## **Building and Testing**
+
+### **Prerequisites**
+- Go 1.23 or later
+
+### **Common Go Commands**
+```bash
+# Build the application
+go build
+
+# Run the application
+go run main.go
+
+# Run all tests
+go test ./...
+
+# Run tests with verbose output
+go test -v ./...
+
+# Run tests with coverage
+go test -cover ./...
+
+# Format code
+go fmt ./...
+
+# Vet code for potential issues
+go vet ./...
+
+# Tidy up dependencies
+go mod tidy
+
+# Download dependencies
+go mod download
+```
+---
 ## **Core Requirements**
 ### **1. Key Management**
 - **Key Generation**:

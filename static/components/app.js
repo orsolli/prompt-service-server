@@ -1,5 +1,5 @@
-import { h } from 'https://esm.sh/preact';
-import { useState } from 'https://esm.sh/preact/hooks';
+import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import { KeyList } from './key-list.js';
 import { ImportForm } from './import-form.js';
 import { useKeyStore } from '../utils/storage-utils.js';

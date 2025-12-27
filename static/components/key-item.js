@@ -1,4 +1,4 @@
-import { h } from 'https://esm.sh/preact';
+import { h } from 'preact';
 export function KeyItem({ keyData, removeKey }) {
     const keyHash = keyData.publicKeyHash;
     return h('div', { className: 'key-item' },

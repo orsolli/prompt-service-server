@@ -6,11 +6,14 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"prompt-service-server/config"
 	"prompt-service-server/core"
 	"prompt-service-server/utils"
 
 	"github.com/gorilla/mux"
 )
+
+var cfg = config.LoadConfig()
 
 type PromptHandler struct {
 	store *core.PromptStore
@@ -23,6 +26,11 @@ func NewPromptHandler(store *core.PromptStore) *PromptHandler {
 }
 
 func (h *PromptHandler) Post(w http.ResponseWriter, r *http.Request) {
+	if r.ContentLength > cfg.MaxRequestBodySize {
+		http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+
 	// Parse request body
 	var req struct {
 		PublicKey string `json:"public_key"`
@@ -80,6 +88,11 @@ func (h *PromptHandler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *PromptHandler) Respond(w http.ResponseWriter, r *http.Request) {
+	if r.ContentLength > cfg.MaxRequestBodySize {
+		http.Error(w, "Request body too large", http.StatusRequestEntityTooLarge)
+		return
+	}
+
 	vars := mux.Vars(r)
 	id := vars["id"]
 	var keyHash string

@@ -1,6 +1,6 @@
 // components/prompt-list.js
-import { h } from 'https://esm.sh/preact';
-import { useState } from 'https://esm.sh/preact/hooks';
+import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import { signMessage } from '../utils/key-utils.js';
 import { hashPublicKey } from '../utils/crypto-utils.js';
 import { useKeyStore } from '../utils/storage-utils.js';
