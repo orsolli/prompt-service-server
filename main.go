@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"log"
 	"net/http"
 	"prompt-service-server/config"
@@ -10,15 +11,16 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func main() {
-	// Load config
-	cfg := config.LoadConfig()
+//go:embed static/*
+//go:embed favicon.ico
+var staticFiles embed.FS
 
+func InitializeRouter(cfg *config.Config) *mux.Router {
 	promptStore := core.NewPromptStore()
 
 	// Initialize handlers
-	indexHandler := handlers.NewIndexHandler()
-	keyHandler := handlers.NewKeyHandler()
+	indexHandler := handlers.NewIndexHandler(staticFiles)
+	keyHandler := handlers.NewKeyHandler(staticFiles)
 	authHandler := handlers.NewAuthHandler()
 	promptHandler := handlers.NewPromptHandler(promptStore)
 	sseHandler := handlers.NewSSEHandler(promptStore)
@@ -27,7 +29,8 @@ func main() {
 	r := mux.NewRouter()
 
 	// This will serve files under http://localhost:8000/static/<filename>
-	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
+	r.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticFiles)))
+	r.Handle("/favicon.ico", http.FileServer(http.FS(staticFiles)))
 
 	// API endpoints
 	r.HandleFunc("/", indexHandler.Get).Methods("GET")
@@ -37,6 +40,14 @@ func main() {
 	r.HandleFunc("/api/prompts/{id}", promptHandler.Respond).Methods("POST")
 	r.HandleFunc("/api/prompts/{id}", promptHandler.Get).Methods("GET")
 	r.HandleFunc("/api/sse/{id}", sseHandler.Get).Methods("GET")
+
+	return r
+}
+
+func main() {
+	// Load config
+	cfg := config.LoadConfig()
+	r := InitializeRouter(cfg)
 
 	// Start server
 	port := cfg.Port

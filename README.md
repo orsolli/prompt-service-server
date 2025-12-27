@@ -36,6 +36,82 @@ go mod tidy
 go mod download
 ```
 ---
+## **Nix/NixOS Deployment**
+
+This project includes Nix support for reproducible builds and secure service deployment. Static files (HTML, CSS, JS) are embedded directly into the binary for improved security and portability.
+
+### **Prerequisites**
+- Nix package manager
+- NixOS (for service deployment)
+
+### **Development with Nix**
+```bash
+# Enter development shell
+nix-shell
+
+# Build the application
+nix-build
+
+# Run the application
+./result/bin/prompt-service-server
+```
+
+### **NixOS Service Deployment**
+
+The project provides a NixOS module for running the service as a systemd service with hardened security settings.
+
+1. **Add to your NixOS configuration**:
+```nix
+{ config, lib, pkgs, ... }:
+
+let
+  # Import the prompt-service-server package and module
+  promptService = import /path/to/prompt-service-server/default.nix { inherit pkgs; };
+  promptServiceModule = import /path/to/prompt-service-server/nixos-module.nix;
+in
+{
+  # Import the prompt-service-server module
+  imports = [ promptServiceModule ];
+
+  # Enable and configure the service
+  services.prompt-service-server = {
+    enable = true;
+    port = 3000;
+    csrfTokenSecret = "your-csrf-secret";     # Use a secure random key
+  };
+
+  # Open firewall port
+  networking.firewall.allowedTCPPorts = [ 3000 ];
+}
+```
+
+2. **Security Features**:
+   - Runs as dedicated system user (`prompt-service`)
+   - Private temporary directories
+   - No new privileges
+   - Strict system protection
+   - Memory write protection
+   - Restricted namespaces and address families
+   - **Static files embedded in binary** - no filesystem access needed for web assets
+   - Limited file descriptors
+
+3. **Rebuild and deploy**:
+```bash
+sudo nixos-rebuild switch
+```
+
+### **Manual Service Management**
+```bash
+# Check service status
+sudo systemctl status prompt-service-server
+
+# View logs
+sudo journalctl -u prompt-service-server -f
+
+# Restart service
+sudo systemctl restart prompt-service-server
+```
+---
 ## **Core Requirements**
 ### **1. Key Management**
 - **Key Generation**:

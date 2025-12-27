@@ -1,4 +1,4 @@
-package handlers
+package main
 
 import (
 	"bytes"
@@ -15,7 +15,7 @@ import (
 	"testing"
 	"time"
 
-	"prompt-service-server/core"
+	"prompt-service-server/config"
 	"prompt-service-server/utils"
 
 	"github.com/gorilla/mux"
@@ -24,24 +24,8 @@ import (
 )
 
 func setupTestRouter() *mux.Router {
-	promptStore := core.NewPromptStore()
-
-	indexHandler := NewIndexHandler()
-	keyHandler := NewKeyHandler()
-	authHandler := NewAuthHandler()
-	promptHandler := NewPromptHandler(promptStore)
-	sseHandler := NewSSEHandler(promptStore)
-
-	r := mux.NewRouter()
-	r.HandleFunc("/", indexHandler.Get).Methods("GET")
-	r.HandleFunc("/key/{id}", keyHandler.Get).Methods("GET")
-	r.HandleFunc("/api/auth/{id}", authHandler.Get).Methods("GET")
-	r.HandleFunc("/api/prompts", promptHandler.Post).Methods("POST")
-	r.HandleFunc("/api/prompts/{id}", promptHandler.Get).Methods("GET")
-	r.HandleFunc("/api/prompts/{id}", promptHandler.Respond).Methods("POST")
-	r.HandleFunc("/api/sse/{id}", sseHandler.Get).Methods("GET")
-
-	return r
+	cfg := config.LoadConfig()
+	return InitializeRouter(cfg)
 }
 
 func TestIndexHandler_Get(t *testing.T) {

@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"embed"
 	"fmt"
 	"net/http"
 	"strings"
@@ -51,10 +52,14 @@ func getCSPConfig() CSPConfig {
 	}
 }
 
-type IndexHandler struct{}
+type IndexHandler struct {
+	staticFiles embed.FS
+}
 
-func NewIndexHandler() *IndexHandler {
-	return &IndexHandler{}
+func NewIndexHandler(staticFiles embed.FS) *IndexHandler {
+	return &IndexHandler{
+		staticFiles: staticFiles,
+	}
 }
 
 func (h *IndexHandler) Get(w http.ResponseWriter, r *http.Request) {
@@ -63,8 +68,14 @@ func (h *IndexHandler) Get(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Frame-Options", "DENY")
 
-	// Check if user has keys in localStorage
-	// This is a client-side check, but we can set up the redirect logic here
-	// For now, we'll just serve the index.html
-	http.ServeFile(w, r, "static/index.html")
+	// Serve index.html with embedded JavaScript
+	p, err := h.staticFiles.ReadFile("static/index.html")
+	if err != nil {
+		http.Error(w, "Failed to read index.html", http.StatusInternalServerError)
+		return
+	}
+	if _, writeErr := w.Write(p); writeErr != nil {
+		// Optionally log the error or handle it as needed
+		http.Error(w, "Failed to write response", http.StatusInternalServerError)
+	}
 }

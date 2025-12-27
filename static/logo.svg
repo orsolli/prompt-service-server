@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 75 75" width="75" height="75">
+  <circle cx="36.5" cy="36.5" r="36.5" fill="white"/>
+  <!-- Spine -->
+  <path d="M29,11 L29,61" stroke="#001" stroke-width="8" fill="none"/>
+  <!-- Top curve -->
+  <path d="M29,15 Q53,13 51,31 Q51,39 36,39" stroke="#001" stroke-width="8" fill="none"/>
+</svg>

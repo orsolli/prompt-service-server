@@ -22,7 +22,6 @@ func TestLoadConfig(t *testing.T) {
 	config := LoadConfig()
 
 	assert.Equal(t, "8080", config.Port)
-	assert.Equal(t, "test-jwt-secret", config.JWTSecret)
 	assert.Equal(t, 300, config.CSRFTokenExpirySeconds)
 	assert.Equal(t, "test-csrf-secret", config.CSRFTokenSecret)
 }
@@ -32,7 +31,6 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	config := LoadConfig()
 
 	assert.Empty(t, config.Port)
-	assert.Empty(t, config.JWTSecret)
 	assert.Equal(t, 300, config.CSRFTokenExpirySeconds)
 	assert.Empty(t, config.CSRFTokenSecret)
 }
