@@ -1,10 +1,33 @@
-## **System Overview**
-This webserver acts as a prompt service, enabling users to receive and respond to prompts without relying on `window.prompt`. It uses asymmetric cryptography for authentication and secure communication. The system supports three types of users: new users, returning users, and users with externally generated keys.
+# Prompt Service
+
+## **What is Prompt Service?**
+
+Prompt Service is a secure way to send and receive interactive prompts through a web interface. Instead of relying on a browser (`window.prompt`) or a repl (`input`), it provides a universal, real-time interface for prompt interactions.
+
+### **Why Choose Prompt Service?**
+
+- **🔒 Secure**: Uses advanced cryptography to ensure only you can respond to your prompts
+- **⚡ Real-time**: Get instant notifications when new prompts arrive
+- **🌐 Web-based**: Access from any modern web browser
+
+### **How It Works**
+
+1. **Get Started**: Visit the service and generate a secure keypair
+2. **Receive Prompts**: Connect to receive prompts in real-time
+3. **Send Prompts**: Programmatically send prompts to the key via API
+4. **Respond**: Answer prompts through a clean web interface
+
+### **Quick Start**
+
+Ready to try it? Here's how to get started in minutes:
+
+1. Open your web browser and navigate to the Prompt Service URL
+2. Click "Generate New Key" to create your secure identity
+3. Prompts can be sent using `curl localhost/api/prompts -X POST -d '{"public_key": "xY...A0=", "message": "Can you see this?"}'`
+4. Start receiving and responding to prompts immediately!
+
 ---
 ## **Building and Testing**
-
-### **Prerequisites**
-- Go 1.23 or later
 
 ### **Common Go Commands**
 ```bash
