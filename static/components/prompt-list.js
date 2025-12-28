@@ -98,6 +98,7 @@ export function PromptList() {
         
         eventSource.onerror = (error) => {
             console.error('SSE Error:', error);
+            setError('SSE connection error');
         };
 
         return eventSource;
