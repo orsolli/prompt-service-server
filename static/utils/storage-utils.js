@@ -70,6 +70,23 @@ export function useKeyStore(callback) {
     };
     const removeKey = (keyHash) => {
         setKeys(prev => prev.filter(k => k.publicKeyHash !== keyHash));
+        try {
+            // Update localStorage
+            const storedKeys = localStorage.getItem('promptServiceKeys');
+            let keyList = [];
+            if (storedKeys) {
+                try {
+                    keyList = JSON.parse(storedKeys);
+                } catch (e) {
+                    console.warn('Failed to parse localStorage keys:', e);
+                }
+            }
+            localStorage.setItem('promptServiceKeys',
+                JSON.stringify(keyList.filter(k => k.publicKeyHash !== keyHash))
+            );
+        } catch (error) {
+            console.error('Error removing key:', error);
+        }
     };
     return [loading, keys, addKey, removeKey];
 }

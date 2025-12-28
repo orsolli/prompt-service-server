@@ -50,21 +50,21 @@ export function App() {
                 if (keyMatch) {
                     parsedData['privateKey'] = keyMatch[1].replace(/\s/g, '');
                 } else {
-                    throw new Error('Invalid SSH key format');
+                    parsedData['privateKey'] = importText.trim();
                 }
             } catch (e) {
                 throw new Error('Failed to parse private key');
             }
             try {
                 // Try to parse as SSH key format
-                const keyMatch = importText.match(/ssh-.\ (.*?)\ (.*?)/s);
+                const keyMatch = publicKey.match(/ssh-.*\ (.*?)\ ?(.*?)/s);
                 if (keyMatch) {
-                    parsedData['privateKey'] = keyMatch[1].replace(/\s/g, '');
+                    parsedData['publicKey'] = keyMatch[1].replace(/\s/g, '');
                 } else {
-                    throw new Error('Invalid SSH key format');
+                    parsedData['publicKey'] = publicKey.trim();
                 }
             } catch (e) {
-                throw new Error('Failed to parse private key');
+                throw new Error('Failed to parse public key');
             }
             // Validate structure
             if (!parsedData.privateKey && !parsedData.publicKey) {
