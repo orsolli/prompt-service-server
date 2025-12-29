@@ -28,6 +28,20 @@ in {
       '';
     };
 
+    allowedOrigins = mkOption {
+      type = types.str;
+      default = "";
+      description = ''
+        Comma-separated list of allowed origins for CORS.
+        
+        If empty, CORS will only be enabled for POST /api/prompts (unrestricted).
+        If set, these origins will be allowed for all other endpoints.
+        Use "*" to allow all origins (not recommended for production).
+        
+        Example: "https://example.com,https://app.example.com"
+      '';
+    };
+
     user = mkOption {
       type = types.str;
       default = "prompt-service";
@@ -81,6 +95,7 @@ in {
         Environment = [
           "PORT=${toString cfg.port}"
           "CSRF_TOKEN_SECRET=${cfg.csrfTokenSecret}"
+          "ALLOWED_ORIGINS=${cfg.allowedOrigins}"
         ];
 
         # Restart on failure
