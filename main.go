@@ -24,9 +24,13 @@ func InitializeRouter(cfg *config.Config) *mux.Router {
 	authHandler := handlers.NewAuthHandler()
 	promptHandler := handlers.NewPromptHandler(promptStore)
 	sseHandler := handlers.NewSSEHandler(promptStore)
+	corsMiddleware := handlers.NewCORSMiddleware(cfg)
 
 	// Create router
 	r := mux.NewRouter()
+
+	// Apply CORS middleware to all routes
+	r.Use(corsMiddleware.Handler)
 
 	// This will serve files under http://localhost:8000/static/<filename>
 	r.PathPrefix("/static/").Handler(http.FileServer(http.FS(staticFiles)))
@@ -36,7 +40,7 @@ func InitializeRouter(cfg *config.Config) *mux.Router {
 	r.HandleFunc("/", indexHandler.Get).Methods("GET")
 	r.HandleFunc("/key/{id}", keyHandler.Get).Methods("GET")
 	r.HandleFunc("/api/auth/{id}", authHandler.Get).Methods("GET")
-	r.HandleFunc("/api/prompts", promptHandler.Post).Methods("POST")
+	r.HandleFunc("/api/prompts", promptHandler.Post).Methods("POST", "OPTIONS")
 	r.HandleFunc("/api/prompts/{id}", promptHandler.Respond).Methods("POST")
 	r.HandleFunc("/api/prompts/{id}", promptHandler.Get).Methods("GET")
 	r.HandleFunc("/api/sse/{id}", sseHandler.Get).Methods("GET")

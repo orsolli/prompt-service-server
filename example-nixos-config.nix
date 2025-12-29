@@ -17,6 +17,7 @@ in
     enable = true;
     port = 3000;  # Change from default 8080 if needed
     csrfTokenSecret = "your-csrf-secret-here";     # Generate a secure random key
+    allowedOrigins = "https://your-domain.com";    # Optional: comma-separated list of allowed origins for CORS
   };
 
   # Optional: Configure firewall

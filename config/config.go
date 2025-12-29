@@ -9,6 +9,7 @@ type Config struct {
 	CSRFTokenExpirySeconds int
 	CSRFTokenSecret        string
 	MaxRequestBodySize     int64
+	AllowedOrigins         string
 }
 
 func LoadConfig() *Config {
@@ -17,5 +18,6 @@ func LoadConfig() *Config {
 		CSRFTokenExpirySeconds: 300, // 5 minutes
 		CSRFTokenSecret:        os.Getenv("CSRF_TOKEN_SECRET"),
 		MaxRequestBodySize:     10 * 1024 * 1024, // 10MB limit
+		AllowedOrigins:         os.Getenv("ALLOWED_ORIGINS"),
 	}
 }

@@ -101,6 +101,7 @@ in
     enable = true;
     port = 3000;
     csrfTokenSecret = "your-csrf-secret";     # Use a secure random key
+    allowedOrigins = "https://example.com";   # Optional: comma-separated list of allowed origins
   };
 
   # Open firewall port
@@ -108,7 +109,17 @@ in
 }
 ```
 
-2. **Security Features**:
+2. **Configuration Options**:
+   - `enable`: Enable or disable the service
+   - `port`: Port to listen on (default: 8080)
+   - `csrfTokenSecret`: Secret key for CSRF token generation (required)
+   - `allowedOrigins`: Comma-separated list of allowed origins for CORS (optional)
+     - If not set: CORS is only enabled for `POST /api/prompts` (unrestricted)
+     - If set: These origins are allowed for all endpoints
+     - Use `"*"` to allow all origins (not recommended for production)
+     - Example: `"https://example.com,https://app.example.com"`
+
+3. **Security Features**:
    - Runs as dedicated system user (`prompt-service`)
    - Private temporary directories
    - No new privileges
@@ -117,8 +128,9 @@ in
    - Restricted namespaces and address families
    - **Static files embedded in binary** - no filesystem access needed for web assets
    - Limited file descriptors
+   - **CORS protection**: `POST /api/prompts` allows unrestricted cross-origin requests for public prompt submission, while all other endpoints respect the `allowedOrigins` configuration
 
-3. **Rebuild and deploy**:
+4. **Rebuild and deploy**:
 ```bash
 sudo nixos-rebuild switch
 ```

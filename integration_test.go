@@ -379,3 +379,48 @@ foundPrompt:
 		t.Log("SSE did not finish cleanly, but that's expected due to context cancellation")
 	}
 }
+
+func TestCORS_Integration(t *testing.T) {
+	t.Run("POST /api/prompts allows any origin", func(t *testing.T) {
+		router := setupTestRouter()
+
+		reqBody := map[string]string{
+			"public_key": "dGVzdC1wdWJsaWMta2V5", // base64 encoded "test-public-key"
+			"message":    "Test CORS message",
+		}
+		body, _ := json.Marshal(reqBody)
+
+		req := httptest.NewRequest("POST", "/api/prompts", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Origin", "https://random-origin.com")
+
+		w := httptest.NewRecorder()
+
+		// Run in goroutine since it blocks waiting for response
+		done := make(chan bool)
+		go func() {
+			router.ServeHTTP(w, req)
+			done <- true
+		}()
+
+		// Check that CORS headers are set immediately
+		time.Sleep(50 * time.Millisecond)
+		assert.Equal(t, "https://random-origin.com", w.Header().Get("Access-Control-Allow-Origin"))
+		assert.Equal(t, "false", w.Header().Get("Access-Control-Allow-Credentials"))
+	})
+
+	t.Run("OPTIONS /api/prompts returns CORS headers", func(t *testing.T) {
+		router := setupTestRouter()
+
+		req := httptest.NewRequest("OPTIONS", "/api/prompts", nil)
+		req.Header.Set("Origin", "https://example.com")
+		req.Header.Set("Access-Control-Request-Method", "POST")
+
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusNoContent, w.Code)
+		assert.Equal(t, "https://example.com", w.Header().Get("Access-Control-Allow-Origin"))
+		assert.Contains(t, w.Header().Get("Access-Control-Allow-Methods"), "POST")
+	})
+}
